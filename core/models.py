@@ -1,7 +1,28 @@
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 from django.db import models
 
-User = get_user_model()
+
+class User(AbstractUser):
+    class Role(models.TextChoices):
+        ADMIN = 'ADMIN', 'Admin'
+        MANAGER = 'MANAGER', 'Manager'
+        USER = 'USER', 'User'
+
+    role = models.CharField(
+        'Роль',
+        max_length=20,
+        choices=Role.choices,
+        default=Role.USER,
+    )
+
+    def save(self, *args, **kwargs):
+        if self.is_superuser:
+            self.role = self.Role.ADMIN
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.username} ({self.role})'
 
 
 class Category(models.Model):
@@ -35,7 +56,7 @@ class Product(models.Model):
         return f'{self.name} ({self.price} руб.)'
 
 
-class Sales(models.Model):
+class Sale(models.Model):
      class PaymentMethod(models.TextChoices):
          CARD = 'CARD', 'Кредитная карта'
          WALLET = 'WALLET', 'Онлайн-кошелёк'
@@ -48,7 +69,7 @@ class Sales(models.Model):
          CANCELLED = 'CANCELLED', 'Отменён'
 
      manager = models.ForeignKey(
-         User,
+         settings.AUTH_USER_MODEL,
          verbose_name='Менеджер',
          on_delete=models.SET_NULL,
          null=True,

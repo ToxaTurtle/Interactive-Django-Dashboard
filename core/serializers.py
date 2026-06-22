@@ -16,14 +16,14 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = ['id','category', 'category_name', 'name', 'price', 'sku']
 
 
-class SalesSerializer(serializers.ModelSerializer):
+class SaleSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     manager_name = serializers.CharField(source='manager.name', read_only=True)
 
     total_price = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
 
     class Meta:
-        model = models.Sales
+        model = models.Sale
         fields = '__all__'
         read_only_fields = ['manager', 'total_price']
 
