@@ -1,0 +1,12 @@
+Django==6.0.6
+ipython==9.14.1
+Pillow==12.2.0
+django-filter==25.2
+djangorestframework==3.17.1
+django-stubs==6.0.5
+django-stubs-ext==6.0.5
+djangorestframework-stubs==3.17.0
+drf-spectacular==0.29.0
+django-cors-headers==4.9.0
+factory-boy==3.3.3
+coverage==7.14.2
