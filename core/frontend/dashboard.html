@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Аналитика продаж</h1>
+            <div class="flex items-center gap-4">
+                <span id="userInfoLabel" class="text-sm text-gray-600 bg-white px-3 py-1.5 rounded shadow-sm font-medium">Загрузка профиля...</span>
+                <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Выйти</button>
+            </div>
+        </div>
+
+        <!-- Карточки статистики -->
+        <div id="statsCards" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <p class="text-gray-500">Общая выручка</p>
+                <h3 id="totalRevenue" class="text-2xl font-bold text-gray-800">0 ₽</h3>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <p class="text-gray-500">Всего продаж</p>
+                <h3 id="totalSales" class="text-2xl font-bold text-gray-800">0</h3>
+            </div>
+        </div>
+
+        <!-- Панель управления -->
+        <div class="bg-white p-4 rounded-lg shadow mb-8 flex gap-4 items-center flex-wrap">
+            <select id="sortField" onchange="renderTableAndStats()" class="border p-2 rounded">
+                <option value="-created_at">Дата (свежие)</option>
+                <option value="created_at">Дата (старые)</option>
+                <option value="quantity">Количество</option>
+                <option value="product_name">Название товара (А-Я)</option>
+                <option value="-total_price">Сумма (убыв.)</option>
+                <option value="total_price">Сумма (возр.)</option>
+            </select>
+
+            <select id="managerSelect" onchange="selectManagerDropdown(this.value)" class="border p-2 rounded hidden">
+                <option value="">Все менеджеры</option>
+            </select>
+
+            <button onclick="resetFilters()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">Сбросить фильтры</button>
+        </div>
+
+        <!-- Блок графиков (динамическая сетка) -->
+        <div id="chartsGrid" class="grid grid-cols-1 gap-8 mb-8">
+            <div id="categoryChartContainer" class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-lg font-bold mb-2">Продажи по категориям</h2>
+                <p class="text-xs text-gray-400 mb-4">* Нажмите на сектор для фильтрации по категории</p>
+                <canvas id="categoryChart"></canvas>
+            </div>
+            <div id="managerChartContainer" class="bg-white p-6 rounded-lg shadow hidden">
+                <h2 class="text-lg font-bold mb-2">Вклад менеджеров</h2>
+                <p class="text-xs text-gray-400 mb-4">* Нажмите на сектор для фильтрации по менеджеру</p>
+                <canvas id="managerChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Таблица операций -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-3">
+                    <h2 id="tableTitle" class="text-xl font-bold">Операции</h2>
+                    <span id="activeFiltersLabel" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded hidden"></span>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="text-gray-400 border-b">
+                            <th class="pb-2">Дата</th>
+                            <th class="pb-2">Товар</th>
+                            <th class="pb-2">Кол-во</th>
+                            <th id="managerHeader" class="pb-2 hidden">Менеджер</th>
+                            <th class="pb-2">Сумма</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salesTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        let currentUser = null; // Хранит профиль текущего пользователя
+
+        let categoryChartInstance = null;
+        let managerChartInstance = null;
+
+        // Локальное хранилище данных
+        let allSales = [];
+        let initialStats = {};
+
+        // Клиентские фильтры
+        let clientFilterCategory = '';
+        let clientFilterManager = '';
+
+        // Проверка авторизации и получение роли с бэкенда
+        async function fetchUserProfileAndSetup() {
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            try {
+                // Запрашиваем профиль текущего пользователя с сервера
+                const res = await fetch('http://127.0.0.1:8000/api/v1/sales/users/me/', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+
+                if (res.status === 401) {
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                currentUser = await res.json();
+
+                // Отображаем имя пользователя на верхней панели
+                document.getElementById('userInfoLabel').textContent = `Пользователь: ${currentUser.username} (${currentUser.role})`;
+
+                // Настраиваем UI в зависимости от роли
+                setupRoleBasedUI();
+
+                // Загружаем данные аналитики
+                await loadInitialData();
+            } catch (e) {
+                console.error('Ошибка авторизации:', e);
+                document.getElementById('userInfoLabel').textContent = 'Ошибка авторизации';
+            }
+        }
+
+        function setupRoleBasedUI() {
+            const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
+
+            if (isAdmin) {
+                // Показываем админские элементы
+                document.getElementById('managerSelect').classList.remove('hidden');
+                document.getElementById('managerChartContainer').classList.remove('hidden');
+                document.getElementById('managerHeader').classList.remove('hidden');
+
+                // Настраиваем сетку графиков на двухколоночную
+                document.getElementById('chartsGrid').className = "grid grid-cols-1 md:grid-cols-2 gap-8 mb-8";
+
+                // Загружаем список менеджеров в селектор
+                loadManagersList();
+            } else {
+                // Если зашел менеджер - скрываем график менеджеров и центрируем график категорий
+                document.getElementById('managerChartContainer').classList.add('hidden');
+                document.getElementById('managerHeader').classList.add('hidden');
+                document.getElementById('chartsGrid').className = "grid grid-cols-1 max-w-2xl mx-auto gap-8 mb-8";
+            }
+        }
+
+        async function loadManagersList() {
+            try {
+                const res = await fetch('http://127.0.0.1:8000/api/v1/sales/users/', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const users = await res.json();
+                const select = document.getElementById('managerSelect');
+                users.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.username;
+                    opt.textContent = u.username;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Ошибка получения списка менеджеров:', e);
+            }
+        }
+
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+        const categoryColors = {};
+
+        function getColorForCategory(name) {
+            if (!categoryColors[name]) {
+                categoryColors[name] = COLORS[Object.keys(categoryColors).length % COLORS.length];
+            }
+            return categoryColors[name];
+        }
+
+        async function loadInitialData() {
+            try {
+                const [resStats, resSales] = await Promise.all([
+                    fetch(`http://127.0.0.1:8000/api/v1/sales/sales/analytics/`, { headers: { 'Authorization': 'Bearer ' + token } }),
+                    fetch(`http://127.0.0.1:8000/api/v1/sales/sales/`, { headers: { 'Authorization': 'Bearer ' + token } })
+                ]);
+
+                initialStats = await resStats.json();
+                allSales = await resSales.json();
+
+                renderCharts(initialStats);
+                renderTableAndStats();
+            } catch (err) {
+                console.error("Ошибка загрузки данных:", err);
+            }
+        }
+
+        function renderCharts(stats) {
+            if(categoryChartInstance) categoryChartInstance.destroy();
+
+            // Строим график категорий
+            categoryChartInstance = new Chart(document.getElementById('categoryChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: stats.by_category.map(c => c.product__category__name),
+                    datasets: [{
+                        data: stats.by_category.map(c => c.revenue),
+                        backgroundColor: stats.by_category.map(c => getColorForCategory(c.product__category__name))
+                    }]
+                },
+                options: {
+                    onClick: (e, elements) => {
+                        if (elements.length > 0) {
+                            const activeLabel = categoryChartInstance.data.labels[elements[0].index];
+                            clientFilterCategory = (clientFilterCategory === activeLabel) ? '' : activeLabel;
+                            renderTableAndStats();
+                        }
+                    }
+                }
+            });
+
+            // Строим график вклада менеджеров только для Администратора
+            const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
+            if (isAdmin) {
+                if(managerChartInstance) managerChartInstance.destroy();
+
+                managerChartInstance = new Chart(document.getElementById('managerChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: stats.by_manager.map(m => m.manager__username),
+                        datasets: [{
+                            data: stats.by_manager.map(m => m.revenue),
+                            backgroundColor: ['#60a5fa', '#34d399', '#fbbf24', '#f87171']
+                        }]
+                    },
+                    options: {
+                        onClick: (e, elements) => {
+                            if (elements.length > 0) {
+                                const activeLabel = managerChartInstance.data.labels[elements[0].index];
+                                clientFilterManager = (clientFilterManager === activeLabel) ? '' : activeLabel;
+
+                                const select = document.getElementById('managerSelect');
+                                if (select) select.value = clientFilterManager;
+
+                                renderTableAndStats();
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function selectManagerDropdown(username) {
+            clientFilterManager = username;
+            renderTableAndStats();
+        }
+
+        function renderTableAndStats() {
+            let filteredSales = [...allSales];
+            const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
+
+            // Локальная фильтрация по категории
+            if (clientFilterCategory) {
+                filteredSales = filteredSales.filter(s => {
+                    return s.product_name && s.product_name.toLowerCase().includes(clientFilterCategory.toLowerCase());
+                });
+            }
+
+            // Локальная фильтрация по менеджеру (только если админ фильтрует)
+            if (isAdmin && clientFilterManager) {
+                filteredSales = filteredSales.filter(s => s.manager_name === clientFilterManager);
+            }
+
+            // Локальная сортировка
+            const sortField = document.getElementById('sortField').value;
+            filteredSales.sort((a, b) => {
+                if (sortField === '-created_at') return new Date(b.created_at) - new Date(a.created_at);
+                if (sortField === 'created_at') return new Date(a.created_at) - new Date(b.created_at);
+                if (sortField === 'quantity') return b.quantity - a.quantity;
+                if (sortField === 'product_name') return a.product_name.localeCompare(b.product_name);
+                if (sortField === '-total_price') return parseFloat(b.total_price) - parseFloat(a.total_price);
+                if (sortField === 'total_price') return parseFloat(a.total_price) - parseFloat(b.total_price);
+                return 0;
+            });
+
+            // Подсчет статистики в реальном времени
+            const totalRevenue = filteredSales.reduce((acc, curr) => acc + parseFloat(curr.total_price), 0);
+            const totalCount = filteredSales.length;
+
+            document.getElementById('totalRevenue').textContent = `${totalRevenue.toLocaleString()} ₽`;
+            document.getElementById('totalSales').textContent = totalCount;
+
+            // Отрисовка строк таблицы
+            const tbody = document.getElementById('salesTable');
+            tbody.innerHTML = filteredSales.map(s => {
+                const managerTd = isAdmin
+                    ? `<td class="py-2 text-blue-600 font-semibold">${s.manager_name || '-'}</td>`
+                    : '';
+
+                return `
+                <tr class="border-b hover:bg-gray-50 transition">
+                    <td class="py-2 text-gray-500">${s.created_at.split(' ')[0]}</td>
+                    <td class="py-2 font-medium">${s.product_name}</td>
+                    <td class="py-2">${s.quantity}</td>
+                    ${managerTd}
+                    <td class="py-2 font-semibold">${Number(s.total_price).toLocaleString()} ₽</td>
+                </tr>`;
+            }).join('');
+
+            // Управление плашкой активных фильтров
+            const label = document.getElementById('activeFiltersLabel');
+            let labelsText = [];
+            if (clientFilterCategory) labelsText.push(`Категория: ${clientFilterCategory}`);
+            if (isAdmin && clientFilterManager) labelsText.push(`Менеджер: ${clientFilterManager}`);
+
+            if (labelsText.length > 0) {
+                label.textContent = labelsText.join(' | ');
+                label.classList.remove('hidden');
+            } else {
+                label.textContent = '';
+                label.classList.add('hidden');
+            }
+        }
+
+        function resetFilters() {
+            clientFilterCategory = '';
+            clientFilterManager = '';
+            document.getElementById('sortField').value = '-created_at';
+            const select = document.getElementById('managerSelect');
+            if (select) select.value = '';
+            renderTableAndStats();
+        }
+
+        document.getElementById('logoutBtn').onclick = () => {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        };
+
+        // Инициализация при загрузке
+        fetchUserProfileAndSetup();
+    </script>
+</body>
+</html>
