@@ -31,13 +31,13 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
+
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['category']
     ordering_fields = ['price', 'name']
 
 
 class SaleViewSet(viewsets.ModelViewSet):
-    queryset = Sale.objects.select_related('product', 'manager').all()
     serializer_class = SaleSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -45,18 +45,28 @@ class SaleViewSet(viewsets.ModelViewSet):
     ordering_fields  = ['created_at', 'total_price']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Sale.objects.select_related('product', 'manager').all()
+
+        if user.is_superuser or user.role == 'ADMIN':
+            return queryset
+        return queryset.filter(manager=user)
 
     @action(detail=False, methods=['get'])
     def analytics(self, request):
-        total_stats = Sale.objects.aggregate(
+        queryset = self.get_queryset()
+
+        total_stats = queryset.aggregate(
             total_revenue=Sum('total_price'),
             total_count=Count('id')
         )
-        category_stats = Sale.objects.values('product__category__name').annotate(
+        category_stats = queryset.values('product__category__name').annotate(
             revenue=Sum('total_price'),
             count=Count('id')
         ).order_by('-revenue')
-        payment_stats = Sale.objects.values('payment_method').annotate(
+
+        payment_stats = queryset.values('payment_method').annotate(
             revenue=Sum('total_price'),
             count=Count('id')
         ).order_by('-revenue')
