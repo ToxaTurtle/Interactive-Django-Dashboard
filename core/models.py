@@ -17,7 +17,7 @@ class User(AbstractUser):
     )
 
     def save(self, *args, **kwargs):
-        if self.is_superuser:
+        if self.is_superuser and self.role != self.role.ADMIN:
             self.role = self.Role.ADMIN
         super().save(*args, **kwargs)
 
@@ -85,8 +85,8 @@ class Sale(models.Model):
 
      quantity = models.IntegerField('Количество', default=1)
 
-     total_price = models.DecimalField('Итоговая стоимость', max_digits=13, decimal_places=2)
-     shipping_cost = models.DecimalField('Стоимость доставки', max_digits=13, decimal_places=2, default=0.00)
+     total_price = models.DecimalField('Итоговая стоимость', max_digits=11, decimal_places=2)
+     shipping_cost = models.DecimalField('Стоимость доставки', max_digits=11, decimal_places=2, default=0.00)
 
      payment_method = models.CharField(
          'Способ оплаты',
@@ -108,6 +108,15 @@ class Sale(models.Model):
          verbose_name = 'Продажа'
          verbose_name_plural = 'Продажи'
          ordering = ('-created_at',)
+         indexes = [
+             models.Index(fields=['status', 'created_at']),
+             models.Index(fields=['manager', 'created_at']),
+         ]
 
      def __str__(self):
          return f'Продажа #{self.pk} - {self.product.name} ({self.quantity} шт.)'
+
+     def save(self, *args, **kwargs):
+         if not self.total_price or self.total_price == 0:
+             self.total_price = self.product.price * self.quantity + self.shipping_cost
+         super().save(*args, **kwargs)
