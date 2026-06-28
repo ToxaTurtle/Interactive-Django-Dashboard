@@ -7,32 +7,38 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-8">
+<body class="bg-gray-100 min-h-screen p-6">
 
     <div class="max-w-6xl mx-auto">
         <div class="flex justify-between items-center mb-8">
             <h1 class="text-3xl font-bold text-gray-800">Аналитика продаж</h1>
             <div class="flex items-center gap-4">
-                <span id="userInfoLabel" class="text-sm text-gray-600 bg-white px-3 py-1.5 rounded shadow-sm font-medium">Загрузка профиля...</span>
-                <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Выйти</button>
+                <span id="userInfoLabel" class="text-sm text-gray-600 bg-white px-4 py-2 rounded-lg shadow font-medium">
+                    Загрузка профиля...
+                </span>
+                <button id="logoutBtn"
+                        class="bg-red-500 text-white px-5 py-2 rounded-lg hover:bg-red-600 transition font-medium">
+                    Выйти
+                </button>
             </div>
         </div>
 
         <!-- Карточки статистики -->
         <div id="statsCards" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <p class="text-gray-500">Общая выручка</p>
-                <h3 id="totalRevenue" class="text-2xl font-bold text-gray-800">0 ₽</h3>
+            <div class="bg-white p-6 rounded-xl shadow">
+                <p class="text-gray-500 text-sm">Общая выручка</p>
+                <h3 id="totalRevenue" class="text-3xl font-bold text-gray-800 mt-1">0 ₽</h3>
             </div>
-            <div class="bg-white p-6 rounded-lg shadow">
-                <p class="text-gray-500">Всего продаж</p>
-                <h3 id="totalSales" class="text-2xl font-bold text-gray-800">0</h3>
+            <div class="bg-white p-6 rounded-xl shadow">
+                <p class="text-gray-500 text-sm">Всего продаж</p>
+                <h3 id="totalSales" class="text-3xl font-bold text-gray-800 mt-1">0</h3>
             </div>
         </div>
 
         <!-- Панель управления -->
-        <div class="bg-white p-4 rounded-lg shadow mb-8 flex gap-4 items-center flex-wrap">
-            <select id="sortField" onchange="renderTableAndStats()" class="border p-2 rounded">
+        <div class="bg-white p-5 rounded-xl shadow mb-8 flex gap-4 items-center flex-wrap">
+            <select id="sortField" onchange="renderTableAndStats()"
+                    class="border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:border-blue-500">
                 <option value="-created_at">Дата (свежие)</option>
                 <option value="created_at">Дата (старые)</option>
                 <option value="quantity">Количество</option>
@@ -41,68 +47,69 @@
                 <option value="total_price">Сумма (возр.)</option>
             </select>
 
-            <select id="managerSelect" onchange="selectManagerDropdown(this.value)" class="border p-2 rounded hidden">
+            <select id="managerSelect" onchange="selectManagerDropdown(this.value)"
+                    class="border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:border-blue-500 hidden">
                 <option value="">Все менеджеры</option>
             </select>
 
-            <button onclick="resetFilters()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">Сбросить фильтры</button>
+            <button onclick="resetFilters()"
+                    class="bg-gray-500 text-white px-5 py-2.5 rounded-lg hover:bg-gray-600 transition">
+                Сбросить фильтры
+            </button>
         </div>
 
-        <!-- Блок графиков (динамическая сетка) -->
+        <!-- Графики -->
         <div id="chartsGrid" class="grid grid-cols-1 gap-8 mb-8">
-            <div id="categoryChartContainer" class="bg-white p-6 rounded-lg shadow">
+            <div id="categoryChartContainer" class="bg-white p-6 rounded-xl shadow">
                 <h2 class="text-lg font-bold mb-2">Продажи по категориям</h2>
-                <p class="text-xs text-gray-400 mb-4">* Нажмите на сектор для фильтрации по категории</p>
-                <canvas id="categoryChart"></canvas>
+                <p class="text-xs text-gray-400 mb-4">* Нажмите на сектор для фильтрации</p>
+                <canvas id="categoryChart" height="120"></canvas>
             </div>
-            <div id="managerChartContainer" class="bg-white p-6 rounded-lg shadow hidden">
+            <div id="managerChartContainer" class="bg-white p-6 rounded-xl shadow hidden">
                 <h2 class="text-lg font-bold mb-2">Вклад менеджеров</h2>
-                <p class="text-xs text-gray-400 mb-4">* Нажмите на сектор для фильтрации по менеджеру</p>
-                <canvas id="managerChart"></canvas>
+                <p class="text-xs text-gray-400 mb-4">* Нажмите на сектор для фильтрации</p>
+                <canvas id="managerChart" height="120"></canvas>
             </div>
         </div>
 
-        <!-- Таблица операций -->
-        <div class="bg-white p-6 rounded-lg shadow">
-            <div class="flex justify-between items-center mb-4">
+        <!-- Таблица -->
+        <div class="bg-white p-6 rounded-xl shadow">
+            <div class="flex justify-between items-center mb-5">
                 <div class="flex items-center gap-3">
                     <h2 id="tableTitle" class="text-xl font-bold">Операции</h2>
-                    <span id="activeFiltersLabel" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded hidden"></span>
+                    <span id="activeFiltersLabel"
+                          class="bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full hidden"></span>
                 </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
+                <table class="w-full text-sm">
                     <thead>
-                        <tr class="text-gray-400 border-b">
-                            <th class="pb-2">Дата</th>
-                            <th class="pb-2">Товар</th>
-                            <th class="pb-2">Кол-во</th>
-                            <th id="managerHeader" class="pb-2 hidden">Менеджер</th>
-                            <th class="pb-2">Сумма</th>
+                        <tr class="border-b text-gray-500">
+                            <th class="pb-3 text-left">Дата</th>
+                            <th class="pb-3 text-left">Товар</th>
+                            <th class="pb-3 text-left">Кол-во</th>
+                            <th id="managerHeader" class="pb-3 text-left hidden">Менеджер</th>
+                            <th class="pb-3 text-left">Сумма</th>
                         </tr>
                     </thead>
-                    <tbody id="salesTable"></tbody>
+                    <tbody id="salesTable" class="text-gray-700"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
+        const API_BASE = 'http://127.0.0.1:8000/api/v1';
         const token = localStorage.getItem('access_token');
-        let currentUser = null; // Хранит профиль текущего пользователя
+        let currentUser = null;
 
         let categoryChartInstance = null;
         let managerChartInstance = null;
 
-        // Локальное хранилище данных
         let allSales = [];
-        let initialStats = {};
-
-        // Клиентские фильтры
         let clientFilterCategory = '';
         let clientFilterManager = '';
 
-        // Проверка авторизации и получение роли с бэкенда
         async function fetchUserProfileAndSetup() {
             if (!token) {
                 window.location.href = 'login.html';
@@ -110,8 +117,7 @@
             }
 
             try {
-                // Запрашиваем профиль текущего пользователя с сервера
-                const res = await fetch('http://127.0.0.1:8000/api/v1/sales/users/me/', {
+                const res = await fetch(`${API_BASE}/sales/users/me/`, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
 
@@ -122,17 +128,13 @@
                 }
 
                 currentUser = await res.json();
+                document.getElementById('userInfoLabel').textContent =
+                    `Пользователь: ${currentUser.username} (${currentUser.role})`;
 
-                // Отображаем имя пользователя на верхней панели
-                document.getElementById('userInfoLabel').textContent = `Пользователь: ${currentUser.username} (${currentUser.role})`;
-
-                // Настраиваем UI в зависимости от роли
                 setupRoleBasedUI();
-
-                // Загружаем данные аналитики
                 await loadInitialData();
             } catch (e) {
-                console.error('Ошибка авторизации:', e);
+                console.error('Ошибка загрузки профиля:', e);
                 document.getElementById('userInfoLabel').textContent = 'Ошибка авторизации';
             }
         }
@@ -141,27 +143,19 @@
             const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
 
             if (isAdmin) {
-                // Показываем админские элементы
                 document.getElementById('managerSelect').classList.remove('hidden');
                 document.getElementById('managerChartContainer').classList.remove('hidden');
                 document.getElementById('managerHeader').classList.remove('hidden');
-
-                // Настраиваем сетку графиков на двухколоночную
                 document.getElementById('chartsGrid').className = "grid grid-cols-1 md:grid-cols-2 gap-8 mb-8";
-
-                // Загружаем список менеджеров в селектор
                 loadManagersList();
             } else {
-                // Если зашел менеджер - скрываем график менеджеров и центрируем график категорий
-                document.getElementById('managerChartContainer').classList.add('hidden');
-                document.getElementById('managerHeader').classList.add('hidden');
                 document.getElementById('chartsGrid').className = "grid grid-cols-1 max-w-2xl mx-auto gap-8 mb-8";
             }
         }
 
         async function loadManagersList() {
             try {
-                const res = await fetch('http://127.0.0.1:8000/api/v1/sales/users/', {
+                const res = await fetch(`${API_BASE}/sales/users/`, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 const users = await res.json();
@@ -173,41 +167,40 @@
                     select.appendChild(opt);
                 });
             } catch (e) {
-                console.error('Ошибка получения списка менеджеров:', e);
+                console.error('Ошибка загрузки менеджеров:', e);
             }
-        }
-
-        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
-        const categoryColors = {};
-
-        function getColorForCategory(name) {
-            if (!categoryColors[name]) {
-                categoryColors[name] = COLORS[Object.keys(categoryColors).length % COLORS.length];
-            }
-            return categoryColors[name];
         }
 
         async function loadInitialData() {
             try {
-                const [resStats, resSales] = await Promise.all([
-                    fetch(`http://127.0.0.1:8000/api/v1/sales/sales/analytics/`, { headers: { 'Authorization': 'Bearer ' + token } }),
-                    fetch(`http://127.0.0.1:8000/api/v1/sales/sales/`, { headers: { 'Authorization': 'Bearer ' + token } })
+                const [statsRes, salesRes] = await Promise.all([
+                    fetch(`${API_BASE}/sales/sales/analytics/`, { headers: { 'Authorization': 'Bearer ' + token } }),
+                    fetch(`${API_BASE}/sales/sales/`, { headers: { 'Authorization': 'Bearer ' + token } })
                 ]);
 
-                initialStats = await resStats.json();
-                allSales = await resSales.json();
+                const stats = await statsRes.json();
+                allSales = await salesRes.json();
 
-                renderCharts(initialStats);
+                renderCharts(stats);
                 renderTableAndStats();
             } catch (err) {
                 console.error("Ошибка загрузки данных:", err);
             }
         }
 
-        function renderCharts(stats) {
-            if(categoryChartInstance) categoryChartInstance.destroy();
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-            // Строим график категорий
+        function getColorForCategory(name) {
+            if (!window.categoryColors) window.categoryColors = {};
+            if (!window.categoryColors[name]) {
+                window.categoryColors[name] = COLORS[Object.keys(window.categoryColors).length % COLORS.length];
+            }
+            return window.categoryColors[name];
+        }
+
+        function renderCharts(stats) {
+            if (categoryChartInstance) categoryChartInstance.destroy();
+
             categoryChartInstance = new Chart(document.getElementById('categoryChart'), {
                 type: 'doughnut',
                 data: {
@@ -218,20 +211,20 @@
                     }]
                 },
                 options: {
+                    responsive: true,
                     onClick: (e, elements) => {
                         if (elements.length > 0) {
-                            const activeLabel = categoryChartInstance.data.labels[elements[0].index];
-                            clientFilterCategory = (clientFilterCategory === activeLabel) ? '' : activeLabel;
+                            const label = categoryChartInstance.data.labels[elements[0].index];
+                            clientFilterCategory = (clientFilterCategory === label) ? '' : label;
                             renderTableAndStats();
                         }
                     }
                 }
             });
 
-            // Строим график вклада менеджеров только для Администратора
             const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
-            if (isAdmin) {
-                if(managerChartInstance) managerChartInstance.destroy();
+            if (isAdmin && stats.by_manager) {
+                if (managerChartInstance) managerChartInstance.destroy();
 
                 managerChartInstance = new Chart(document.getElementById('managerChart'), {
                     type: 'pie',
@@ -243,14 +236,12 @@
                         }]
                     },
                     options: {
+                        responsive: true,
                         onClick: (e, elements) => {
                             if (elements.length > 0) {
-                                const activeLabel = managerChartInstance.data.labels[elements[0].index];
-                                clientFilterManager = (clientFilterManager === activeLabel) ? '' : activeLabel;
-
-                                const select = document.getElementById('managerSelect');
-                                if (select) select.value = clientFilterManager;
-
+                                const label = managerChartInstance.data.labels[elements[0].index];
+                                clientFilterManager = (clientFilterManager === label) ? '' : label;
+                                document.getElementById('managerSelect').value = clientFilterManager;
                                 renderTableAndStats();
                             }
                         }
@@ -265,24 +256,18 @@
         }
 
         function renderTableAndStats() {
-            let filteredSales = [...allSales];
+            let filtered = [...allSales];
             const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
 
-            // Локальная фильтрация по категории
             if (clientFilterCategory) {
-                filteredSales = filteredSales.filter(s => {
-                    return s.product_name && s.product_name.toLowerCase().includes(clientFilterCategory.toLowerCase());
-                });
+                filtered = filtered.filter(s => s.product_name?.toLowerCase().includes(clientFilterCategory.toLowerCase()));
             }
-
-            // Локальная фильтрация по менеджеру (только если админ фильтрует)
             if (isAdmin && clientFilterManager) {
-                filteredSales = filteredSales.filter(s => s.manager_name === clientFilterManager);
+                filtered = filtered.filter(s => s.manager_name === clientFilterManager);
             }
 
-            // Локальная сортировка
             const sortField = document.getElementById('sortField').value;
-            filteredSales.sort((a, b) => {
+            filtered.sort((a, b) => {
                 if (sortField === '-created_at') return new Date(b.created_at) - new Date(a.created_at);
                 if (sortField === 'created_at') return new Date(a.created_at) - new Date(b.created_at);
                 if (sortField === 'quantity') return b.quantity - a.quantity;
@@ -292,41 +277,31 @@
                 return 0;
             });
 
-            // Подсчет статистики в реальном времени
-            const totalRevenue = filteredSales.reduce((acc, curr) => acc + parseFloat(curr.total_price), 0);
-            const totalCount = filteredSales.length;
+            const totalRevenue = filtered.reduce((sum, s) => sum + parseFloat(s.total_price || 0), 0);
+            document.getElementById('totalRevenue').textContent = `${totalRevenue.toLocaleString('ru-RU')} ₽`;
+            document.getElementById('totalSales').textContent = filtered.length;
 
-            document.getElementById('totalRevenue').textContent = `${totalRevenue.toLocaleString()} ₽`;
-            document.getElementById('totalSales').textContent = totalCount;
-
-            // Отрисовка строк таблицы
             const tbody = document.getElementById('salesTable');
-            tbody.innerHTML = filteredSales.map(s => {
-                const managerTd = isAdmin
-                    ? `<td class="py-2 text-blue-600 font-semibold">${s.manager_name || '-'}</td>`
-                    : '';
-
-                return `
+            tbody.innerHTML = filtered.map(s => `
                 <tr class="border-b hover:bg-gray-50 transition">
-                    <td class="py-2 text-gray-500">${s.created_at.split(' ')[0]}</td>
-                    <td class="py-2 font-medium">${s.product_name}</td>
-                    <td class="py-2">${s.quantity}</td>
-                    ${managerTd}
-                    <td class="py-2 font-semibold">${Number(s.total_price).toLocaleString()} ₽</td>
-                </tr>`;
-            }).join('');
+                    <td class="py-3 text-gray-500">${s.created_at.split('T')[0]}</td>
+                    <td class="py-3 font-medium">${s.product_name}</td>
+                    <td class="py-3">${s.quantity}</td>
+                    ${isAdmin ? `<td class="py-3 text-blue-600 font-medium">${s.manager_name || '-'}</td>` : ''}
+                    <td class="py-3 font-semibold">${Number(s.total_price).toLocaleString('ru-RU')} ₽</td>
+                </tr>
+            `).join('');
 
-            // Управление плашкой активных фильтров
+            // Активные фильтры
             const label = document.getElementById('activeFiltersLabel');
-            let labelsText = [];
-            if (clientFilterCategory) labelsText.push(`Категория: ${clientFilterCategory}`);
-            if (isAdmin && clientFilterManager) labelsText.push(`Менеджер: ${clientFilterManager}`);
+            const filters = [];
+            if (clientFilterCategory) filters.push(`Категория: ${clientFilterCategory}`);
+            if (isAdmin && clientFilterManager) filters.push(`Менеджер: ${clientFilterManager}`);
 
-            if (labelsText.length > 0) {
-                label.textContent = labelsText.join(' | ');
+            if (filters.length) {
+                label.textContent = filters.join(' | ');
                 label.classList.remove('hidden');
             } else {
-                label.textContent = '';
                 label.classList.add('hidden');
             }
         }
@@ -344,8 +319,6 @@
             localStorage.clear();
             window.location.href = 'login.html';
         };
-
-        // Инициализация при загрузке
         fetchUserProfileAndSetup();
     </script>
 </body>
