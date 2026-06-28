@@ -46,7 +46,7 @@ class Product(models.Model):
     )
     name = models.CharField('Название товара', max_length=255, unique=True)
     price = models.DecimalField('Цена', max_digits=11, decimal_places=2)
-    sku = models.CharField('Артикул', max_length=50, unique=True, blank=True, null=True)
+    sku = models.CharField('Артикул', max_length=50, unique=True, blank=False, null=False, default='')
 
     class Meta:
         verbose_name = 'Товар'
@@ -117,6 +117,6 @@ class Sale(models.Model):
          return f'Продажа #{self.pk} - {self.product.name} ({self.quantity} шт.)'
 
      def save(self, *args, **kwargs):
-         if not self.total_price or self.total_price == 0:
+         if not self.pk:
              self.total_price = self.product.price * self.quantity + self.shipping_cost
          super().save(*args, **kwargs)
