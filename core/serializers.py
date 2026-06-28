@@ -14,6 +14,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'password', 'password_confirm', 'role')
         read_only_fields = ('id',)
+        extra_kwargs = {
+            'email': {'required': True},
+        }
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
@@ -25,6 +28,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         role = validated_data.pop('role', User.Role.USER)
         if role == User.Role.ADMIN:
             role = User.Role.USER
+
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
@@ -35,7 +39,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Category
         fields = ['id', 'name', 'description']
@@ -52,18 +55,20 @@ class ProductSerializer(serializers.ModelSerializer):
 class SaleSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     manager_name = serializers.CharField(source='manager.username', read_only=True)
-    total_price = serializers.DecimalField(max_digits=13, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
 
     class Meta:
         model = Sale
         fields = '__all__'
         read_only_fields = ['manager', 'total_price', 'created_at', 'updated_at']
 
+    def validate_quantity(self, value):
+        if value < 1:
+            raise serializers.ValidationError('Количество должно быть больше 0.')
+
     def create(self, validated_data):
-        product = validated_data['product']
-        quantity = validated_data.get('quantity', 1)
-        validated_data['total_price'] = product.price * quantity
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             validated_data['manager'] = request.user
+
         return super().create(validated_data)
