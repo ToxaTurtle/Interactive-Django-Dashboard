@@ -87,7 +87,7 @@ class SaleViewSet(viewsets.ModelViewSet):
             total_count=Count('id')
         )
 
-        category_stats = queryset.values('productcategoryname').annotate(
+        category_stats = queryset.values('product__category__name').annotate(
             revenue=Sum('total_price'),
             count=Count('id')
         ).order_by('-revenue')
