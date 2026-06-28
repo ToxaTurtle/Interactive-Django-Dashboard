@@ -46,7 +46,7 @@ class Product(models.Model):
     )
     name = models.CharField('Название товара', max_length=255, unique=True)
     price = models.DecimalField('Цена', max_digits=11, decimal_places=2)
-    sku = models.CharField('Артикул', max_length=50, unique=True, blank=False, null=False, default='')
+    sku = models.CharField('Артикул', max_length=50, unique=True, blank=True, default='')
 
     class Meta:
         verbose_name = 'Товар'
