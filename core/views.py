@@ -1,4 +1,4 @@
-from rest_framework import viewsets, generics, serializers
+from rest_framework import viewsets, generics, serializers, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -32,8 +32,10 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
             return User.objects.all()
         return User.objects.filter(pk=user.pk)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Необходима авторизация.'}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
@@ -51,7 +53,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('category').all()
+    queryset = Product.objects.select_related('category').prefetch_related('sales').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
