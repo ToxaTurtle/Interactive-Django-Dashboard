@@ -1,0 +1,18 @@
+services:
+  # Бэкенд на Django
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+
+  # Фронтенд
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./core/frontend:/usr/share/nginx/html
