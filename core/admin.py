@@ -55,9 +55,10 @@ class SaleAdmin(admin.ModelAdmin):
         'created_at',
     )
     list_filter = ('status', 'payment_method', 'manager', 'created_at')
-    search_fields = ('productname', 'managerusername')
+    search_fields = ('product__name', 'manager__username')
     readonly_fields = ('total_price', 'created_at', 'updated_at')
     raw_id_fields = ('product', 'manager')
+    autocomplete_fields = ('product', 'manager')
     date_hierarchy = 'created_at'
 
     def save_model(self, request, obj: Sale, form, change):
