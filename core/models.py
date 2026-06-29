@@ -17,7 +17,7 @@ class User(AbstractUser):
     )
 
     def save(self, *args, **kwargs):
-        if self.is_superuser and self.role != self.role.ADMIN:
+        if self.is_superuser and self.role != self.Role.ADMIN:
             self.role = self.Role.ADMIN
         super().save(*args, **kwargs)
 
@@ -46,7 +46,7 @@ class Product(models.Model):
     )
     name = models.CharField('Название товара', max_length=255, unique=True)
     price = models.DecimalField('Цена', max_digits=11, decimal_places=2)
-    sku = models.CharField('Артикул', max_length=50, unique=True, blank=True, default='')
+    sku = models.CharField('Артикул', max_length=50, unique=True, blank=False, null=False)
 
     class Meta:
         verbose_name = 'Товар'
@@ -119,4 +119,10 @@ class Sale(models.Model):
      def save(self, *args, **kwargs):
          if not self.pk:
              self.total_price = self.product.price * self.quantity + self.shipping_cost
+         else:
+             original = Sale.objects.get(pk=self.pk)
+             if (original.quantity != self.quantity or
+                 original.shipping_cost != self.shipping_cost or
+                 original.product.id != self.product.id):
+                 self.total_price = self.product.price * self.quantity + self.shipping_cost
          super().save(*args, **kwargs)
