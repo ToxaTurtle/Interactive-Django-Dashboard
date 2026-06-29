@@ -12,22 +12,32 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'password', 'password_confirm', 'role')
-        read_only_fields = ('id',)
+        fields = ('username', 'email', 'password', 'password_confirm', 'role')
         extra_kwargs = {
             'email': {'required': True},
+            'role': {'required': False},
         }
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError('Пользователь с таким именем уже существует.')
+        return value
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError({'password': 'Пароли не совпадают.'})
+            raise serializers.ValidationError({'password_confirm': 'Пароли не совпадают.'})
         return attrs
 
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         role = validated_data.pop('role', User.Role.USER)
+
+        request = self.context.get('request')
         if role == User.Role.ADMIN:
-            role = User.Role.USER
+            if not request or not request.user or not request.user.is_superuser:
+                raise serializers.ValidationError({
+                    'role': 'Только суперпользователи могут создавать администраторов.'
+                })
 
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -65,10 +75,15 @@ class SaleSerializer(serializers.ModelSerializer):
     def validate_quantity(self, value):
         if value < 1:
             raise serializers.ValidationError('Количество должно быть больше 0.')
+        return value
 
     def create(self, validated_data):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            validated_data['manager'] = request.user
-
+            if request.user.role in [User.Role.Manager, User.Role.ADMIN] or request.user.is_superuser:
+                validated_data['manager'] = request.user
+            else:
+                raise serializers.ValidationError('Юзеры не могут создавать продажи.')
+        else:
+            raise serializers.ValidationError('Нужна авторизация.')
         return super().create(validated_data)
