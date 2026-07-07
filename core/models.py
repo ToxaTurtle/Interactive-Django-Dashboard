@@ -45,7 +45,7 @@ class Product(models.Model):
         related_name='products',
     )
     name = models.CharField('Название товара', max_length=255, unique=True)
-    price = models.DecimalField('Цена', max_digits=11, decimal_places=2)
+    price = models.BigIntegerField('Цена (в копейках)')
     sku = models.CharField('Артикул', max_length=50, unique=True, blank=False, null=False)
 
     class Meta:
@@ -53,7 +53,7 @@ class Product(models.Model):
         verbose_name_plural = 'Товары'
 
     def __str__(self):
-        return f'{self.name} ({self.price} руб.)'
+        return f'{self.name} ({self.price / 100:.2f} руб.)'
 
 
 class Sale(models.Model):
@@ -79,14 +79,14 @@ class Sale(models.Model):
      product = models.ForeignKey(
          Product,
          verbose_name='Товар',
-         on_delete=models.CASCADE,
+         on_delete=models.PROTECT,
          related_name='sales',
      )
 
      quantity = models.IntegerField('Количество', default=1)
 
-     total_price = models.DecimalField('Итоговая стоимость', max_digits=11, decimal_places=2)
-     shipping_cost = models.DecimalField('Стоимость доставки', max_digits=11, decimal_places=2, default=0.00)
+     total_price = models.PositiveBigIntegerField('Итоговая стоимость', blank=True, editable=False)
+     shipping_cost = models.PositiveBigIntegerField('Стоимость доставки', default=0)
 
      payment_method = models.CharField(
          'Способ оплаты',
@@ -115,14 +115,3 @@ class Sale(models.Model):
 
      def __str__(self):
          return f'Продажа #{self.pk} - {self.product.name} ({self.quantity} шт.)'
-
-     def save(self, *args, **kwargs):
-         if not self.pk:
-             self.total_price = self.product.price * self.quantity + self.shipping_cost
-         else:
-             original = Sale.objects.get(pk=self.pk)
-             if (original.quantity != self.quantity or
-                 original.shipping_cost != self.shipping_cost or
-                 original.product.id != self.product.id):
-                 self.total_price = self.product.price * self.quantity + self.shipping_cost
-         super().save(*args, **kwargs)
