@@ -3,83 +3,110 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from core.models import User, Category, Product, Sale
 
-
 class Command(BaseCommand):
-    help = 'Генерация тестовых данных с распределением дат и статусов'
+    help = 'Генерация реалистичных тестовых данных'
 
-    def handle(self, *args, **kwargs):
-        self.stdout.write(self.style.WARNING('Начинаем генерацию тестовых данных...'))
+    def handle(self, *args, **options):
+        self.stdout.write(self.style.WARNING('Очистка старых данных...'))
+        Sale.objects.all().delete()
+        Product.objects.all().delete()
+        Category.objects.all().delete()
 
-        # 1. Создаём менеджеров
+        self.stdout.write(self.style.WARNING('Создание менеджеров...'))
+        # Пароль '123' оставляем для удобства ручной отладки в Swagger/Postman
+        managers_data = [
+            {'username': 'ivan_manager', 'email': 'ivan@example.com'},
+            {'username': 'anna_manager', 'email': 'anna@example.com'},
+            {'username': 'petr_manager', 'email': 'petr@example.com'},
+        ]
         managers = []
-        for i in range(1, 4):
-            username = f'manager{i}'
+        for m_data in managers_data:
             manager, created = User.objects.get_or_create(
-                username=username,
-                defaults={'role': User.Role.MANAGER}
+                username=m_data['username'],
+                defaults={'role': User.Role.MANAGER, 'email': m_data['email']}
             )
-            if created:
-                manager.set_password('123')
-                manager.save()
-                self.stdout.write(f'Создан новый менеджер: {username}')
-            else:
-                self.stdout.write(f'Менеджер уже существует: {username}')
+            manager.set_password('123')
+            manager.save()
             managers.append(manager)
 
-        # 2. Создаём категории и товары
-        categories_data = [
-            'Смартфоны', 'Ноутбуки', 'Аудио',
-            'Бытовая техника', 'Аксессуары', 'Игры'
-        ]
+            # Реалистичная матрица товаров на базе популярных ниш
+            # Цены в словаре указаны в привычных рублях, ниже мы переведем их в копейки
+            market_data = {
+                'Электроника': [
+                    {'name': 'Смартфон Apple iPhone 15 128GB', 'price': 85000, 'sku': 'EL-IPH15-128'},
+                    {'name': 'Беспроводные наушники Xiaomi Redmi Buds 5', 'price': 3500, 'sku': 'EL-XMB5-W'},
+                    {'name': 'Робот-пылесос Xiaomi Robot Vacuum S10', 'price': 18000, 'sku': 'EL-XMVAC-S10'},
+                ],
+                'Одежда и обувь': [
+                    {'name': 'Худи оверсайз хлопковое', 'price': 2900, 'sku': 'CL-HOOD-OV'},
+                    {'name': 'Кроссовки демисезонные спортивные', 'price': 5400, 'sku': 'CL-SNEAK-DM'},
+                    {'name': 'Футболка базовая однотонная', 'price': 1200, 'sku': 'CL-TSHIRT-BZ'},
+                ],
+                'Красота и уход': [
+                    {'name': 'Сыворотка для лица с гиалуроновой кислотой', 'price': 850, 'sku': 'BM-SERUM-HA'},
+                    {'name': 'Увлажняющий крем для кожи CeraVe', 'price': 1600, 'sku': 'BM-CREAM-CRV'},
+                    {'name': 'Парфюмерная вода Dior Sauvage 100мл', 'price': 14500, 'sku': 'BM-DIOR-SAV'},
+                ],
+                'Товары для дома': [
+                    {'name': 'Увлажнитель воздуха ультразвуковой', 'price': 3200, 'sku': 'HM-HUM-ULTR'},
+                    {'name': 'Набор кухонных ножей из стали (5 шт)', 'price': 4100, 'sku': 'HM-KNIF-SET'},
+                    {'name': 'Ароматическая свеча в стакане "Кокос"', 'price': 650, 'sku': 'HM-CAND-COC'},
+                ]
+            }
 
-        for cat_name in categories_data:
-            category, _ = Category.objects.get_or_create(name=cat_name)
+            self.stdout.write(self.style.WARNING('Генерация категорий и товаров...'))
+            all_products = []
+            for cat_name, products_list in market_data.items():
+                category, _ = Category.objects.get_or_create(name=cat_name)
+                for prod_data in products_list:
+                    product, _ = Product.objects.get_or_create(
+                        name=prod_data['name'],
+                        category=category,
+                        defaults={
+                            'price': prod_data['price'] * 100,  # Конвертация рублей в копейки
+                            'sku': prod_data['sku']
+                        }
+                    )
+                    all_products.append(product)
 
-            for i in range(3):  # увеличил до 3 товаров на категорию
-                product_name = f'{cat_name} - Модель {i + 1}'
+                    self.stdout.write(self.style.WARNING('Генерация исторических продаж за последние 30 дней...'))
+                    now = timezone.now()
+                    created_count = 0
 
-                Product.objects.get_or_create(
-                    name=product_name,
-                    category=category,
-                    defaults={
-                        'price': round(random.uniform(5000, 120000), 2),
-                        'sku': f'{cat_name[:3].upper()}-{100 + i * 10 + random.randint(1, 99)}'  # генерируем артикул
-                    }
-                )
+                    for _ in range(100):
+                        product = random.choice(all_products)
+                        manager = random.choice(managers)
+                        quantity = random.randint(1, 4)
 
-        # 3. Генерируем продажи
-        products = list(Product.objects.all())
-        now = timezone.now()
+                        # Стоимость доставки в копейках (0, 199 руб, 299 руб, 499 руб)
+                        shipping_rub = random.choice([0, 0, 199, 299, 499])
+                        shipping_cost = shipping_rub * 100
 
-        created_count = 0
-        for _ in range(80):
-            prod = random.choice(products)
-            qty = random.randint(1, 5)
+                        # Расчет итоговой стоимости продажи в копейках (в соответствии с бизнес-логикой)
+                        total_price = (product.price * quantity) + shipping_cost
 
-            manager = random.choice(managers)
+                        # Распределение дат для красивых графиков аналитики
+                        random_days_ago = random.randint(0, 30)
+                        random_hours_ago = random.randint(0, 23)
+                        sale_time = now - timezone.timedelta(days=random_days_ago, hours=random_hours_ago)
 
-            random_days = random.randint(-30, 10)
-            random_seconds = random.randint(0, 86400)
-            created_at = now + timezone.timedelta(days=random_days, seconds=random_seconds)
+                        # Используем прямой ORM create, чтобы принудительно переопределить дату auto_now_add
+                        Sale.objects.create(
+                            manager=manager,
+                            product=product,
+                            quantity=quantity,
+                            shipping_cost=shipping_cost,
+                            total_price=total_price,
+                            payment_method=random.choice([m[0] for m in Sale.PaymentMethod.choices]),
+                            status=random.choice([s[0] for s in Sale.Status.choices]),
+                            created_at=sale_time
+                        )
+                        created_count += 1
 
-            Sale.objects.create(
-                manager=manager,
-                product=prod,
-                quantity=qty,
-                shipping_cost=random.choice([0, 0, 0, 150, 350, 499]),
-                payment_method=random.choice([m[0] for m in Sale.PaymentMethod.choices]),
-                status=random.choice([s[0] for s in Sale.Status.choices]),
-                created_at=created_at,
-            )
-            created_count += 1
-
-        total_products = Product.objects.count()
-
-        self.stdout.write(self.style.SUCCESS(
-            f'\nГенерация завершена успешно! '
-            f'Создано/обновлено:\n'
-            f'   • Менеджеров: {len(managers)}\n'
-            f'   • Категорий: {len(categories_data)}\n'
-            f'   • Товаров: {total_products}\n'
-            f'   • Продаж: {created_count}'
-        ))
+                    self.stdout.write(self.style.SUCCESS(
+                        f'\n[УСПЕХ] База успешно наполнена реалистичными данными:\n'
+                        f'   • Создано менеджеров: {len(managers)}\n'
+                        f'   • Категорий маркетплейсов: {len(market_data)}\n'
+                        f'   • Уникальных товаров: {len(all_products)}\n'
+                        f'   • Исторических продаж оформлено: {created_count}'
+                    ))
