@@ -2,8 +2,15 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from .models import Category, Product, Sale
+from .services import SaleService
 
 User = get_user_model()
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'role', 'is_superuser', 'email']
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -65,7 +72,17 @@ class ProductSerializer(serializers.ModelSerializer):
 class SaleSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     manager_name = serializers.CharField(source='manager.username', read_only=True)
-    total_price = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
+    product_category = serializers.CharField(
+        source='product.category.name',
+        read_only=True
+    )
+    total_price = serializers.IntegerField(read_only=True)
+
+    # Разрешаем передавать ID менеджера при создании/апдейте
+    manager = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=User.Role.MANAGER),
+        required=False
+    )
 
     class Meta:
         model = Sale
@@ -79,11 +96,20 @@ class SaleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            if request.user.role in [User.Role.Manager, User.Role.ADMIN] or request.user.is_superuser:
-                validated_data['manager'] = request.user
-            else:
-                raise serializers.ValidationError('Юзеры не могут создавать продажи.')
-        else:
+        user = request.user
+
+        if not user or not user.is_authenticated:
             raise serializers.ValidationError('Нужна авторизация.')
-        return super().create(validated_data)
+
+        # Если создает Админ, он МОЖЕТ явно передать менеджера в JSON body.
+        # Если не передал, или создает сам Менеджер — пишем продажу на текущего юзера.
+        if user.is_superuser or user.role == User.Role.ADMIN:
+            manager = validated_data.pop('manager', user)
+        elif user.role == User.Role.MANAGER:
+            # Менеджер не может назначить продажу на кого-то другого, даже если передал id в JSON
+            validated_data.pop('manager', None)
+            manager = user
+        else:
+            raise serializers.ValidationError('Обычные юзеры не могут создавать продажи.')
+
+        return SaleService.create_sale(manager=manager, **validated_data)
