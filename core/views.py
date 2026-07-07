@@ -1,25 +1,22 @@
-from rest_framework import viewsets, generics, serializers, status
+from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
-from django.db.models import Sum, Count
 from django.contrib.auth import get_user_model
+from django.shortcuts import render
 
 from .models import Category, Product, Sale
 from .serializers import (
-    CategorySerializer, ProductSerializer, SaleSerializer, UserRegistrationSerializer
+    CategorySerializer, ProductSerializer, SaleSerializer,
+    UserRegistrationSerializer, UserSerializer
 )
+
 from .permissions import IsAdminOrReadOnly, IsManagerOrAdmin
+from .services import SaleService
 
 User = get_user_model()
-
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'role', 'is_superuser', 'email']
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -34,8 +31,6 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        if not request.user.is_authenticated:
-            return Response({'error': 'Необходима авторизация.'}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
@@ -49,12 +44,14 @@ class RegisterView(generics.CreateAPIView):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    # Читать могут все авторизованные, менять - только Админы
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('category').prefetch_related('sales').all()
+    queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
+    # Читать каталог могут все, редактировать - только Админы
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     filterset_fields = ['category']
@@ -66,7 +63,6 @@ class SaleViewSet(viewsets.ModelViewSet):
     serializer_class = SaleSerializer
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
-
     filterset_fields = ['status', 'payment_method', 'manager']
     ordering_fields = ['quantity', 'total_price', 'product__name', 'created_at']
     ordering = ['-created_at']
@@ -82,27 +78,17 @@ class SaleViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def analytics(self, request):
-        queryset = self.get_queryset()
+        queryset = self.get_filtered_queryset()
+        analytics_data = SaleService.get_analytics(queryset)
+        return Response(analytics_data, status=status.HTTP_200_OK)
 
-        total_stats = queryset.aggregate(
-            total_revenue=Sum('total_price'),
-            total_count=Count('id')
-        )
+    def get_filtered_queryset(self):
+        backend = DjangoFilterBackend()
+        return backend.filter_queryset(self.request, self.get_queryset(), self)
 
-        category_stats = queryset.values('product__category__name').annotate(
-            revenue=Sum('total_price'),
-            count=Count('id')
-        ).order_by('-revenue')
 
-        manager_stats = queryset.values('manager__username').annotate(
-            revenue=Sum('total_price')
-        ).order_by('-revenue')
+def login_page(request):
+    return render(request, 'login.html')
 
-        return Response({
-            'overview': {
-                'total_revenue': total_stats['total_revenue'] or 0,
-                'total_sales': total_stats['total_count'] or 0
-            },
-            'by_category': list(category_stats),
-            'by_manager': list(manager_stats)
-        })
+def dashboard_page(request):
+    return render(request, 'dashboard.html')
