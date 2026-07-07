@@ -15,4 +15,4 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./core/frontend:/usr/share/nginx/html
+      - ./core/templates:/usr/share/nginx/html
