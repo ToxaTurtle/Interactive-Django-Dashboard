@@ -62,7 +62,7 @@
                 if (response.ok) {
                     localStorage.setItem('access_token', data.access);
                     localStorage.setItem('refresh_token', data.refresh);
-                    window.location.href = 'dashboard.html';
+                    window.location.href = '/dashboard/';
                 } else {
                     showError(data.detail || 'Неверный логин или пароль');
                 }

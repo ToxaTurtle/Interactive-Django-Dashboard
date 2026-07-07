@@ -112,7 +112,7 @@
 
         async function fetchUserProfileAndSetup() {
             if (!token) {
-                window.location.href = 'login.html';
+                window.location.href = '/login/';
                 return;
             }
 
@@ -123,7 +123,7 @@
 
                 if (res.status === 401) {
                     localStorage.clear();
-                    window.location.href = 'login.html';
+                    window.location.href = '/login/';
                     return;
                 }
 
@@ -212,12 +212,15 @@
                 },
                 options: {
                     responsive: true,
-                    onClick: (e, elements) => {
-                        if (elements.length > 0) {
-                            const label = categoryChartInstance.data.labels[elements[0].index];
-                            clientFilterCategory = (clientFilterCategory === label) ? '' : label;
-                            renderTableAndStats();
-                        }
+                    maintainAspectRatio: true,
+                    cutout: '65%',
+                    radius: '92%',
+                    onClick: (evt, elements) => {
+                        if (elements.length === 0) return;
+                        const index = elements[0].index;
+                        const label = categoryChartInstance.data.labels[index];
+                        clientFilterCategory = (clientFilterCategory === label) ? '' : label;
+                        renderTableAndStats();
                     }
                 }
             });
@@ -260,7 +263,7 @@
             const isAdmin = currentUser.role === 'ADMIN' || currentUser.is_superuser;
 
             if (clientFilterCategory) {
-                filtered = filtered.filter(s => s.product_name?.toLowerCase().includes(clientFilterCategory.toLowerCase()));
+                filtered = filtered.filter(s => s.product_category === clientFilterCategory);
             }
             if (isAdmin && clientFilterManager) {
                 filtered = filtered.filter(s => s.manager_name === clientFilterManager);
@@ -292,7 +295,6 @@
                 </tr>
             `).join('');
 
-            // Активные фильтры
             const label = document.getElementById('activeFiltersLabel');
             const filters = [];
             if (clientFilterCategory) filters.push(`Категория: ${clientFilterCategory}`);
@@ -317,8 +319,9 @@
 
         document.getElementById('logoutBtn').onclick = () => {
             localStorage.clear();
-            window.location.href = 'login.html';
+            window.location.href = '/login/';
         };
+
         fetchUserProfileAndSetup();
     </script>
 </body>
